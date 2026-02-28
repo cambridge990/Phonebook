@@ -425,36 +425,19 @@
 //  vacant units — they will be skipped in the display.
 // ═══════════════════════════════════════════════════════════════════
 
-const SHEET_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vTQXiUEXJw_rqUUC05cuXJTXmbEXg-wtEr34lcF4cpuT6u6YNvUicGYGRVWWEriIfacMxau3fI348E2/pub?gid=1026240306&single=true&output=csv";
-// ── CSV Parser ─────────────────────────────────────────────────────
-function parseCSV(text) {
-  const lines = text.trim().split('\n');
-  if (lines.length < 2) return [];
-  const headers = lines[0].split(',').map(h => h.trim().replace(/^"|"$/g, '').toLowerCase());
-  return lines.slice(1).map(line => {
-    const fields = [];
-    let current = '';
-    let inQuotes = false;
-    for (let i = 0; i < line.length; i++) {
-      const ch = line[i];
-      if (ch === '"') { inQuotes = !inQuotes; }
-      else if (ch === ',' && !inQuotes) { fields.push(current.trim()); current = ''; }
-      else { current += ch; }
-    }
-    fields.push(current.trim());
-    const obj = {};
-    headers.forEach((h, i) => { obj[h] = (fields[i] || '').replace(/^"|"$/g, '').trim(); });
-    // Normalise types
-    obj.unit     = parseInt(obj.unit)     || 0;
-    obj.building = parseInt(obj.building) || 0;
-    obj.phone    = obj.phone || '';
-    obj.cell     = obj.cell  || '';
-    obj.alt      = obj.alt   || '';
-    obj.full     = obj.full  || '';
-    obj.first    = obj.first || '';
-    obj.last     = obj.last  || '';
-    return obj;
-  });
+const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycby2dLJ8pqO81vBivd0PZZXGgjXj4rIAQLSVD677IrBY7Lr3qsITi4mrOUCqtP9aASio/exec";
+// ── Normalise a row from Apps Script JSON ──────────────────────────
+function normaliseRow(r) {
+  return {
+    unit:     parseInt(r.unit)     || 0,
+    building: parseInt(r.building) || 0,
+    full:     String(r.full  || '').trim(),
+    first:    String(r.first || '').trim(),
+    last:     String(r.last  || '').trim(),
+    phone:    String(r.phone || '').trim(),
+    cell:     String(r.cell  || '').trim(),
+    alt:      String(r.alt   || '').trim(),
+  };
 }
 
 // ── State ──────────────────────────────────────────────────────────
@@ -706,35 +689,14 @@ tabBar.addEventListener('click', e => {
   render();
 });
 
-// ── Load data from Google Sheet ────────────────────────────────────
-// Multiple proxies tried in order — if one fails the next is attempted
-const PROXIES = [
-  url => `https://corsproxy.io/?${encodeURIComponent(url)}`,
-  url => `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`,
-  url => `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(url)}`,
-];
-
-async function fetchWithFallback(url) {
-  for (const makeProxy of PROXIES) {
-    try {
-      const res = await fetch(makeProxy(url), { signal: AbortSignal.timeout(8000) });
-      if (!res.ok) continue;
-      const text = await res.text();
-      // Sanity check — valid CSV starts with our header columns
-      if (text.includes('unit') && text.includes('building')) return text;
-    } catch (e) {
-      // This proxy failed — try the next one
-      continue;
-    }
-  }
-  throw new Error('All proxies failed');
-}
-
+// ── Load data from Apps Script ─────────────────────────────────────
 async function loadData() {
   const statusMsg = document.getElementById('statusMsg');
   try {
-    const text = await fetchWithFallback(SHEET_URL);
-    RESIDENTS = parseCSV(text);
+    const res = await fetch(APPS_SCRIPT_URL);
+    if (!res.ok) throw new Error('Network error');
+    const rows = await res.json();
+    RESIDENTS = rows.map(normaliseRow);
     const totalCount = RESIDENTS.filter(r => r.full).length;
     document.getElementById('resCount').textContent = `${totalCount} residents`;
     statusMsg.style.display = 'none';
