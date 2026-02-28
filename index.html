@@ -426,8 +426,6 @@
 // ═══════════════════════════════════════════════════════════════════
 
 const SHEET_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vTQXiUEXJw_rqUUC05cuXJTXmbEXg-wtEr34lcF4cpuT6u6YNvUicGYGRVWWEriIfacMxau3fI348E2/pub?gid=1026240306&single=true&output=csv";
-const PROXY     = "https://api.allorigins.win/raw?url=";
-
 // ── CSV Parser ─────────────────────────────────────────────────────
 function parseCSV(text) {
   const lines = text.trim().split('\n');
@@ -709,12 +707,33 @@ tabBar.addEventListener('click', e => {
 });
 
 // ── Load data from Google Sheet ────────────────────────────────────
+// Multiple proxies tried in order — if one fails the next is attempted
+const PROXIES = [
+  url => `https://corsproxy.io/?${encodeURIComponent(url)}`,
+  url => `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`,
+  url => `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(url)}`,
+];
+
+async function fetchWithFallback(url) {
+  for (const makeProxy of PROXIES) {
+    try {
+      const res = await fetch(makeProxy(url), { signal: AbortSignal.timeout(8000) });
+      if (!res.ok) continue;
+      const text = await res.text();
+      // Sanity check — valid CSV starts with our header columns
+      if (text.includes('unit') && text.includes('building')) return text;
+    } catch (e) {
+      // This proxy failed — try the next one
+      continue;
+    }
+  }
+  throw new Error('All proxies failed');
+}
+
 async function loadData() {
   const statusMsg = document.getElementById('statusMsg');
   try {
-    const res = await fetch(PROXY + encodeURIComponent(SHEET_URL));
-    if (!res.ok) throw new Error('Network error');
-    const text = await res.text();
+    const text = await fetchWithFallback(SHEET_URL);
     RESIDENTS = parseCSV(text);
     const totalCount = RESIDENTS.filter(r => r.full).length;
     document.getElementById('resCount').textContent = `${totalCount} residents`;
