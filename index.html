@@ -583,10 +583,10 @@ function render() {
   const showBldg = (currentView !== 'building' && currentFilter === 'all');
 
   if (currentView === 'alpha' && !query) {
-    const sorted = [...list].sort((a,b) => a.last.localeCompare(b.last) || a.first.localeCompare(b.first));
+    const sorted = [...list].sort((a,b) => a.first.localeCompare(b.first) || a.last.localeCompare(b.last));
     let lastLetter = '';
     sorted.forEach((r, i) => {
-      const letter = r.last[0].toUpperCase();
+      const letter = r.first[0].toUpperCase();
       if (letter !== lastLetter) {
         lastLetter = letter;
         const label = document.createElement('div');
@@ -616,7 +616,7 @@ function render() {
     });
 
   } else {
-    const sorted = [...list].sort((a,b) => a.last.localeCompare(b.last) || a.first.localeCompare(b.first));
+    const sorted = [...list].sort((a,b) => a.first.localeCompare(b.first) || a.last.localeCompare(b.last));
     sorted.forEach((r, i) => {
       const card = buildCard(r, query, showBldg);
       card.style.animationDelay = (i * 0.012) + 's';
