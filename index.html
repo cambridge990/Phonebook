@@ -555,7 +555,8 @@ function phoneRow(label, number, q) {
 }
 
 // ── Card builder ───────────────────────────────────────────────────
-function buildCard(r, q, showBldg) {
+// useBoardName: only true when called from the Board tab render path
+function buildCard(r, q, showBldg, useBoardName = false) {
   const phones = [r.phone, r.cell, r.cell2].filter(Boolean);
   const hasPhone   = phones.length > 0;
   const multiPhone = phones.length > 1;
@@ -578,10 +579,8 @@ function buildCard(r, q, showBldg) {
 
   const name = document.createElement('div');
   name.className = 'card-name';
-  // Only use the individual board member name in the Board tab view;
-  // all other views always show the full household name.
-  const inBoardView = (currentView === 'board');
-  const displayName = (inBoardView && r.board && r.boardName)
+  // useBoardName is only true when rendering the Board tab — never in other views
+  const displayName = (useBoardName && r.boardName)
     ? highlight(r.boardName + ' ' + r.last, q)
     : highlight(r.full || `Unit ${r.unit}`, q);
   name.innerHTML = displayName;
@@ -694,9 +693,13 @@ function render() {
       label.className = 'section-label';
       label.textContent = 'Board Members';
       content.appendChild(label);
-      [...boardMembers].sort((a,b) => a.last.localeCompare(b.last) || a.first.localeCompare(b.first))
+      [...boardMembers].sort((a,b) => {
+          const aName = a.boardName || a.first;
+          const bName = b.boardName || b.first;
+          return a.last.localeCompare(b.last) || aName.localeCompare(bName);
+        })
         .forEach(r => {
-          const card = buildCard(r, '', true);
+          const card = buildCard(r, '', true, true);  // useBoardName=true
           card.style.animationDelay = (idx++ * 0.015) + 's';
           content.appendChild(card);
         });
