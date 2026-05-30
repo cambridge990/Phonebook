@@ -555,8 +555,8 @@ function phoneRow(label, number, q) {
 }
 
 // ── Card builder ───────────────────────────────────────────────────
-// useBoardName: only true when called from the Board tab render path
-function buildCard(r, q, showBldg, useBoardName = false) {
+// displayOverride: if provided, shown as the card name instead of r.full
+function buildCard(r, q, showBldg, displayOverride = null) {
   const phones = [r.phone, r.cell, r.cell2].filter(Boolean);
   const hasPhone   = phones.length > 0;
   const multiPhone = phones.length > 1;
@@ -579,9 +579,9 @@ function buildCard(r, q, showBldg, useBoardName = false) {
 
   const name = document.createElement('div');
   name.className = 'card-name';
-  // useBoardName is only true when rendering the Board tab — never in other views
-  const displayName = (useBoardName && r.boardName)
-    ? highlight(r.boardName + ' ' + r.last, q)
+  // displayOverride is only passed from the Board tab render path
+  const displayName = displayOverride
+    ? highlight(displayOverride, q)
     : highlight(r.full || `Unit ${r.unit}`, q);
   name.innerHTML = displayName;
 
@@ -699,7 +699,8 @@ function render() {
           return a.last.localeCompare(b.last) || aName.localeCompare(bName);
         })
         .forEach(r => {
-          const card = buildCard(r, '', true, true);  // useBoardName=true
+          const nameOverride = r.boardName ? r.boardName + ' ' + r.last : null;
+          const card = buildCard(r, '', true, nameOverride);
           card.style.animationDelay = (idx++ * 0.015) + 's';
           content.appendChild(card);
         });
