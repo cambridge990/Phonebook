@@ -578,8 +578,10 @@ function buildCard(r, q, showBldg) {
 
   const name = document.createElement('div');
   name.className = 'card-name';
-  // In board view, if only one person in the unit is on the board, show their name specifically
-  const displayName = (r.board && r.boardName)
+  // Only use the individual board member name in the Board tab view;
+  // all other views always show the full household name.
+  const inBoardView = (currentView === 'board');
+  const displayName = (inBoardView && r.board && r.boardName)
     ? highlight(r.boardName + ' ' + r.last, q)
     : highlight(r.full || `Unit ${r.unit}`, q);
   name.innerHTML = displayName;
@@ -597,22 +599,31 @@ function buildCard(r, q, showBldg) {
       else badgeParts.push('Board');
       meta.innerHTML += `<span class="board-badge">${badgeParts.join(' ')}</span>`;
     }
-    if (r.phone && !multiPhone) meta.innerHTML += `<span>${highlight(r.phone, q)}</span>`;
+    if (!multiPhone && phones.length === 1) meta.innerHTML += `<span>${highlight(primaryPhone, q)}</span>`;
   }
 
   info.appendChild(name);
   info.appendChild(meta);
 
-  const callBtn = document.createElement('a');
-  callBtn.className = 'call-btn';
-  callBtn.href = callHref;
-  callBtn.setAttribute('aria-label', 'Call');
-  callBtn.innerHTML = '📞';
-  callBtn.addEventListener('click', e => e.stopPropagation());
+  // For multi-phone cards the right-side button expands the panel (chevron),
+  // not the call button — so the entire card row is a safe tap target.
+  const actionBtn = document.createElement(multiPhone ? 'button' : 'a');
+  actionBtn.className = 'call-btn';
+  if (multiPhone) {
+    actionBtn.type = 'button';
+    actionBtn.innerHTML = '›';
+    actionBtn.style.cssText = 'font-size:22px;font-weight:300;line-height:1;background:var(--navy-light);';
+    actionBtn.setAttribute('aria-label', 'Show phone numbers');
+  } else {
+    actionBtn.href = hasPhone ? callHref : '#';
+    actionBtn.innerHTML = '📞';
+    actionBtn.setAttribute('aria-label', 'Call');
+  }
+  actionBtn.addEventListener('click', e => e.stopPropagation());
 
   main.appendChild(avatar);
   main.appendChild(info);
-  main.appendChild(callBtn);
+  main.appendChild(actionBtn);
   card.appendChild(main);
 
   // Expanded phones panel
@@ -622,25 +633,28 @@ function buildCard(r, q, showBldg) {
 
     if (r.phone) phonesPanel.appendChild(phoneRow('Home', r.phone, q));
 
-    // cell with optional per-person label
     if (r.cell) {
       const cellLabel = r.cell1name ? `Cell – ${r.cell1name}` : 'Cell';
       phonesPanel.appendChild(phoneRow(cellLabel, r.cell, q));
     }
 
-    // second cell with optional per-person label
     if (r.cell2) {
       const cell2Label = r.cell2name ? `Cell – ${r.cell2name}` : 'Cell 2';
       phonesPanel.appendChild(phoneRow(cell2Label, r.cell2, q));
     }
 
     card.appendChild(phonesPanel);
-    main.addEventListener('click', () => {
+
+    const togglePanel = () => {
       const isOpen = phonesPanel.classList.contains('open');
       if (openCard && openCard !== phonesPanel) openCard.classList.remove('open');
       phonesPanel.classList.toggle('open', !isOpen);
+      actionBtn.innerHTML = isOpen ? '›' : '‹';
       openCard = isOpen ? null : phonesPanel;
-    });
+    };
+    main.addEventListener('click', togglePanel);
+    actionBtn.addEventListener('click', e => { e.stopPropagation(); togglePanel(); });
+
   } else if (hasPhone) {
     main.addEventListener('click', () => { window.location.href = callHref; });
   }
