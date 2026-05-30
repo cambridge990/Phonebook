@@ -312,6 +312,42 @@
   .empty-state h3 { font-size: 18px; color: var(--text); margin-bottom: 6px; }
   .empty-state p { font-size: 14px; color: var(--text-muted); }
 
+  /* ── Board badge ── */
+  .board-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+    background: rgba(201,168,76,0.18);
+    border: 1px solid rgba(201,168,76,0.5);
+    color: #8a6a1a;
+    font-size: 9px;
+    font-weight: 700;
+    padding: 2px 7px;
+    border-radius: 10px;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+  }
+  .prop-mgr-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+    background: rgba(26,39,68,0.10);
+    border: 1px solid rgba(26,39,68,0.25);
+    color: var(--navy);
+    font-size: 9px;
+    font-weight: 700;
+    padding: 2px 7px;
+    border-radius: 10px;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+  }
+  .avatar.board-avatar {
+    background: linear-gradient(135deg, #b8860b, #8a6a1a);
+  }
+  .avatar.mgr-avatar {
+    background: linear-gradient(135deg, var(--navy), #0d1830);
+  }
+
   /* ── Highlight ── */
   mark {
     background: rgba(201,168,76,0.35);
@@ -402,6 +438,9 @@
   <button class="nav-btn" id="navBuilding" onclick="setView('building')">
     <span class="nav-icon">🏢</span>Building
   </button>
+  <button class="nav-btn" id="navBoard" onclick="setView('board')">
+    <span class="nav-icon">⭐</span>Board
+  </button>
 </nav>
 
 <script>
@@ -410,16 +449,21 @@
 //  Replace SHEET_URL with your published Google Sheet CSV URL.
 //
 //  Your Google Sheet should have these column headers in Row 1:
-//    unit | building | full | first | last | phone | cell
+//    unit | building | full | first | last | phone | cell | cell1name | cell2 | cell2name | board | propMgr
 //
 //  Column notes:
-//    unit     — unit number (e.g. 101)
-//    building — building number (e.g. 1)
-//    full     — full display name (e.g. "John and Mary Smith")
-//    first    — first name(s) only (e.g. "John and Mary")
-//    last     — last name only (e.g. "Smith")
-//    phone    — home phone number (e.g. 516-555-1234)
-//    cell     — cell phone number (leave blank if none)
+//    unit      — unit number (e.g. 101)
+//    building  — building number (e.g. 1)
+//    full      — full display name (e.g. "John and Mary Smith")
+//    first     — first name(s) only (e.g. "John and Mary")
+//    last      — last name only (e.g. "Smith")
+//    phone     — home/landline phone number (e.g. 516-555-1234)
+//    cell      — first cell phone (e.g. Mary's cell)
+//    cell1name — name label for first cell (e.g. "Mary") — shown as "Cell – Mary"
+//    cell2     — second cell phone (e.g. John's cell)
+//    cell2name — name label for second cell (e.g. "John") — shown as "Cell – John"
+//    board     — type "yes" if this resident is a Board Member
+//    propMgr   — type "yes" for the Property Manager (no unit needed)
 //
 //  Leave a row blank (only unit and building filled in) for
 //  vacant units — they will be skipped in the display.
@@ -429,14 +473,19 @@ const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycby2dLJ8pqO81vBi
 // ── Normalise a row from Apps Script JSON ──────────────────────────
 function normaliseRow(r) {
   return {
-    unit:     parseInt(r.unit)     || 0,
-    building: parseInt(r.building) || 0,
-    full:     String(r.full  || '').trim(),
-    first:    String(r.first || '').trim(),
-    last:     String(r.last  || '').trim(),
-    phone:    String(r.phone || '').trim(),
-    cell:     String(r.cell  || '').trim(),
-    alt:      String(r.alt   || '').trim(),
+    unit:      parseInt(r.unit)      || 0,
+    building:  parseInt(r.building)  || 0,
+    full:      String(r.full   || '').trim(),
+    first:     String(r.first  || '').trim(),
+    last:      String(r.last   || '').trim(),
+    phone:     String(r.phone  || '').trim(),
+    cell:      String(r.cell   || '').trim(),
+    cell2:     String(r.cell2  || '').trim(),       // second person's cell
+    cell2name: String(r.cell2name || '').trim(),    // name label for cell2 (e.g. "John")
+    cell1name: String(r.cell1name || '').trim(),    // name label for cell  (e.g. "Mary")
+    board:     String(r.board  || '').trim().toLowerCase() === 'yes',
+    propMgr:   String(r.propMgr || '').trim().toLowerCase() === 'yes',
+    alt:       String(r.alt    || '').trim(),
   };
 }
 
@@ -471,6 +520,7 @@ function matches(r, q) {
       || String(r.unit).includes(ql)
       || r.phone.includes(ql)
       || r.cell.includes(ql)
+      || r.cell2.includes(ql)
       || r.last.toLowerCase().includes(ql)
       || r.first.toLowerCase().includes(ql);
 }
@@ -501,9 +551,10 @@ function phoneRow(label, number, q) {
 
 // ── Card builder ───────────────────────────────────────────────────
 function buildCard(r, q, showBldg) {
-  const hasPhone  = r.phone || r.cell;
-  const multiPhone = [r.phone, r.cell].filter(Boolean).length > 1;
-  const primaryPhone = r.phone || r.cell || '';
+  const phones = [r.phone, r.cell, r.cell2].filter(Boolean);
+  const hasPhone   = phones.length > 0;
+  const multiPhone = phones.length > 1;
+  const primaryPhone = phones[0] || '';
   const callHref = hasPhone ? `tel:${primaryPhone.replace(/\D/g,'')}` : '#';
 
   const card = document.createElement('div');
@@ -514,7 +565,7 @@ function buildCard(r, q, showBldg) {
   main.className = 'card-main';
 
   const avatar = document.createElement('div');
-  avatar.className = 'avatar';
+  avatar.className = 'avatar' + (r.board ? ' board-avatar' : r.propMgr ? ' mgr-avatar' : '');
   avatar.textContent = initials(r);
 
   const info = document.createElement('div');
@@ -526,9 +577,14 @@ function buildCard(r, q, showBldg) {
 
   const meta = document.createElement('div');
   meta.className = 'card-meta';
-  meta.innerHTML = `<span>Unit ${r.unit}</span>`;
-  if (showBldg) meta.innerHTML += `<span class="bldg-pill">Bldg ${r.building}</span>`;
-  if (r.phone && !multiPhone) meta.innerHTML += `<span>${highlight(r.phone, q)}</span>`;
+  if (r.propMgr) {
+    meta.innerHTML = `<span class="prop-mgr-badge">🏠 Property Manager</span>`;
+  } else {
+    meta.innerHTML = `<span>Unit ${r.unit}</span>`;
+    if (showBldg) meta.innerHTML += `<span class="bldg-pill">Bldg ${r.building}</span>`;
+    if (r.board)  meta.innerHTML += `<span class="board-badge">⭐ Board</span>`;
+    if (r.phone && !multiPhone) meta.innerHTML += `<span>${highlight(r.phone, q)}</span>`;
+  }
 
   info.appendChild(name);
   info.appendChild(meta);
@@ -547,16 +603,29 @@ function buildCard(r, q, showBldg) {
 
   // Expanded phones panel
   if (multiPhone) {
-    const phones = document.createElement('div');
-    phones.className = 'card-phones';
-    if (r.phone) phones.appendChild(phoneRow('Home', r.phone, q));
-    if (r.cell)  phones.appendChild(phoneRow('Cell', r.cell,  q));
-    card.appendChild(phones);
+    const phonesPanel = document.createElement('div');
+    phonesPanel.className = 'card-phones';
+
+    if (r.phone) phonesPanel.appendChild(phoneRow('Home', r.phone, q));
+
+    // cell with optional per-person label
+    if (r.cell) {
+      const cellLabel = r.cell1name ? `Cell – ${r.cell1name}` : 'Cell';
+      phonesPanel.appendChild(phoneRow(cellLabel, r.cell, q));
+    }
+
+    // second cell with optional per-person label
+    if (r.cell2) {
+      const cell2Label = r.cell2name ? `Cell – ${r.cell2name}` : 'Cell 2';
+      phonesPanel.appendChild(phoneRow(cell2Label, r.cell2, q));
+    }
+
+    card.appendChild(phonesPanel);
     main.addEventListener('click', () => {
-      const isOpen = phones.classList.contains('open');
-      if (openCard && openCard !== phones) openCard.classList.remove('open');
-      phones.classList.toggle('open', !isOpen);
-      openCard = isOpen ? null : phones;
+      const isOpen = phonesPanel.classList.contains('open');
+      if (openCard && openCard !== phonesPanel) openCard.classList.remove('open');
+      phonesPanel.classList.toggle('open', !isOpen);
+      openCard = isOpen ? null : phonesPanel;
     });
   } else if (hasPhone) {
     main.addEventListener('click', () => { window.location.href = callHref; });
@@ -572,6 +641,46 @@ function render() {
   openCard = null;
   content.innerHTML = '';
   content.appendChild(emptyState);
+
+  // Board view — separate logic
+  if (currentView === 'board' && !query) {
+    const propMgrs    = RESIDENTS.filter(r => r.propMgr);
+    const boardMembers = RESIDENTS.filter(r => r.board && r.full);
+
+    let idx = 0;
+
+    if (propMgrs.length) {
+      const label = document.createElement('div');
+      label.className = 'section-label';
+      label.textContent = 'Property Manager';
+      content.appendChild(label);
+      propMgrs.forEach(r => {
+        const card = buildCard(r, '', true);
+        card.style.animationDelay = (idx++ * 0.015) + 's';
+        content.appendChild(card);
+      });
+    }
+
+    if (boardMembers.length) {
+      const label = document.createElement('div');
+      label.className = 'section-label';
+      label.textContent = 'Board Members';
+      content.appendChild(label);
+      [...boardMembers].sort((a,b) => a.last.localeCompare(b.last) || a.first.localeCompare(b.first))
+        .forEach(r => {
+          const card = buildCard(r, '', true);
+          card.style.animationDelay = (idx++ * 0.015) + 's';
+          content.appendChild(card);
+        });
+    }
+
+    if (!propMgrs.length && !boardMembers.length) {
+      emptyState.classList.add('visible');
+    } else {
+      emptyState.classList.remove('visible');
+    }
+    return;
+  }
 
   let list = RESIDENTS.filter(r => r.full);
   if (currentFilter !== 'all') list = list.filter(r => r.building === currentFilter);
@@ -638,6 +747,7 @@ function setView(v) {
   document.getElementById('navSearch').classList.toggle('active', v === 'search');
   document.getElementById('navAlpha').classList.toggle('active', v === 'alpha');
   document.getElementById('navBuilding').classList.toggle('active', v === 'building');
+  document.getElementById('navBoard').classList.toggle('active', v === 'board');
   tabBar.style.display = (v === 'building') ? 'flex' : 'none';
   if (v !== 'building') {
     currentFilter = 'all';
@@ -697,7 +807,7 @@ async function loadData() {
     if (!res.ok) throw new Error('Network error');
     const rows = await res.json();
     RESIDENTS = rows.map(normaliseRow);
-    const totalCount = RESIDENTS.filter(r => r.full).length;
+    const totalCount = RESIDENTS.filter(r => r.full && !r.propMgr).length;
     document.getElementById('resCount').textContent = `${totalCount} residents`;
     statusMsg.style.display = 'none';
     initTabs();
