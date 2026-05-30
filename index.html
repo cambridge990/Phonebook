@@ -449,7 +449,7 @@
 //  Replace SHEET_URL with your published Google Sheet CSV URL.
 //
 //  Your Google Sheet should have these column headers in Row 1:
-//    unit | building | full | first | last | phone | cell | cell1name | cell2 | cell2name | board | propMgr
+//    unit | building | full | first | last | phone | cell | cell1name | cell2 | cell2name | board | boardName | boardTitle | propMgr
 //
 //  Column notes:
 //    unit      — unit number (e.g. 101)
@@ -463,6 +463,9 @@
 //    cell2     — second cell phone (e.g. John's cell)
 //    cell2name — name label for second cell (e.g. "John") — shown as "Cell – John"
 //    board     — type "yes" if this resident is a Board Member
+//    boardName — if only one of two owners is on the board, enter their first name
+//                (e.g. "Mary") — the card will show "Mary Smith" instead of "John and Mary Smith"
+//    boardTitle — board role (e.g. President, VP, Secretary, Treasurer) — shown in the badge
 //    propMgr   — type "yes" for the Property Manager (no unit needed)
 //
 //  Leave a row blank (only unit and building filled in) for
@@ -483,8 +486,10 @@ function normaliseRow(r) {
     cell2:     String(r.cell2  || '').trim(),       // second person's cell
     cell2name: String(r.cell2name || '').trim(),    // name label for cell2 (e.g. "John")
     cell1name: String(r.cell1name || '').trim(),    // name label for cell  (e.g. "Mary")
-    board:     String(r.board  || '').trim().toLowerCase() === 'yes',
-    propMgr:   String(r.propMgr || '').trim().toLowerCase() === 'yes',
+    board:      String(r.board  || '').trim().toLowerCase() === 'yes',
+    boardName:  String(r.boardName  || '').trim(),   // first name of the board member if unit has 2 owners
+    boardTitle: String(r.boardTitle || '').trim(),   // e.g. President, VP, Secretary, Treasurer
+    propMgr:    String(r.propMgr || '').trim().toLowerCase() === 'yes',
     alt:       String(r.alt    || '').trim(),
   };
 }
@@ -573,7 +578,11 @@ function buildCard(r, q, showBldg) {
 
   const name = document.createElement('div');
   name.className = 'card-name';
-  name.innerHTML = highlight(r.full || `Unit ${r.unit}`, q);
+  // In board view, if only one person in the unit is on the board, show their name specifically
+  const displayName = (r.board && r.boardName)
+    ? highlight(r.boardName + ' ' + r.last, q)
+    : highlight(r.full || `Unit ${r.unit}`, q);
+  name.innerHTML = displayName;
 
   const meta = document.createElement('div');
   meta.className = 'card-meta';
@@ -582,7 +591,12 @@ function buildCard(r, q, showBldg) {
   } else {
     meta.innerHTML = `<span>Unit ${r.unit}</span>`;
     if (showBldg) meta.innerHTML += `<span class="bldg-pill">Bldg ${r.building}</span>`;
-    if (r.board)  meta.innerHTML += `<span class="board-badge">⭐ Board</span>`;
+    if (r.board) {
+      const badgeParts = ['⭐'];
+      if (r.boardTitle) badgeParts.push(r.boardTitle);
+      else badgeParts.push('Board');
+      meta.innerHTML += `<span class="board-badge">${badgeParts.join(' ')}</span>`;
+    }
     if (r.phone && !multiPhone) meta.innerHTML += `<span>${highlight(r.phone, q)}</span>`;
   }
 
