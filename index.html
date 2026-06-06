@@ -724,10 +724,9 @@ function render() {
     return;
   }
 
-  // propMgr only appears in A-Z and Board views; Board view is handled above
-  const inclPropMgr = (currentView === 'alpha' && !query);
-  let list = RESIDENTS.filter(r => r.full && (!r.propMgr || inclPropMgr));
-  if (currentView === 'building') list = list.filter(r => r.building > 0 && r.unit !== 410);
+  // Unit 410 (Property Manager) only appears in the Board tab
+  let list = RESIDENTS.filter(r => r.full && r.unit !== 410);
+  if (currentView === 'building') list = list.filter(r => r.building > 0);
   if (currentFilter !== 'all') list = list.filter(r => r.building === currentFilter);
   if (query) list = list.filter(r => matches(r, query));
 
