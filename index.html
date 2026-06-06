@@ -676,18 +676,6 @@ function render() {
 
     let idx = 0;
 
-    if (propMgrs.length) {
-      const label = document.createElement('div');
-      label.className = 'section-label';
-      label.textContent = 'Property Manager';
-      content.appendChild(label);
-      propMgrs.forEach(r => {
-        const card = buildCard(r, '', true);
-        card.style.animationDelay = (idx++ * 0.015) + 's';
-        content.appendChild(card);
-      });
-    }
-
     if (boardMembers.length) {
       const label = document.createElement('div');
       label.className = 'section-label';
@@ -706,6 +694,18 @@ function render() {
         });
     }
 
+    if (propMgrs.length) {
+      const label = document.createElement('div');
+      label.className = 'section-label';
+      label.textContent = 'Property Manager';
+      content.appendChild(label);
+      propMgrs.forEach(r => {
+        const card = buildCard(r, '', true);
+        card.style.animationDelay = (idx++ * 0.015) + 's';
+        content.appendChild(card);
+      });
+    }
+
     if (!propMgrs.length && !boardMembers.length) {
       emptyState.classList.add('visible');
     } else {
@@ -715,6 +715,7 @@ function render() {
   }
 
   let list = RESIDENTS.filter(r => r.full);
+  if (currentView === 'building') list = list.filter(r => !r.propMgr);
   if (currentFilter !== 'all') list = list.filter(r => r.building === currentFilter);
   if (query) list = list.filter(r => matches(r, query));
 
