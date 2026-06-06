@@ -715,7 +715,7 @@ function render() {
   }
 
   let list = RESIDENTS.filter(r => r.full);
-  if (currentView === 'building') list = list.filter(r => !r.propMgr);
+  if (currentView === 'building') list = list.filter(r => !r.propMgr && r.building > 0);
   if (currentFilter !== 'all') list = list.filter(r => r.building === currentFilter);
   if (query) list = list.filter(r => matches(r, query));
 
@@ -810,11 +810,11 @@ const tabBar = document.getElementById('tabBar');
 tabBar.style.display = 'none';
 
 function initTabs() {
-  const buildings = [...new Set(RESIDENTS.filter(r => !r.propMgr).map(r => r.building))].sort((a,b) => a - b);
-  // Remove old building buttons (keep the "All" button)
-  const existing = tabBar.querySelectorAll('[data-filter]:not([data-filter="all"])');
-  existing.forEach(b => b.remove());
+  const buildings = [...new Set(RESIDENTS.filter(r => !r.propMgr && r.building > 0).map(r => r.building))].sort((a,b) => a - b);
+  // Remove ALL existing building buttons (keep only "All")
+  tabBar.querySelectorAll('.tab-btn').forEach(b => { if (b.dataset.filter !== 'all') b.remove(); });
   buildings.forEach(b => {
+    if (b <= 0) return;  // never create a building 0 tab
     const btn = document.createElement('button');
     btn.className = 'tab-btn';
     btn.dataset.filter = b;
