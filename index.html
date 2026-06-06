@@ -810,7 +810,7 @@ const tabBar = document.getElementById('tabBar');
 tabBar.style.display = 'none';
 
 function initTabs() {
-  const buildings = [...new Set(RESIDENTS.map(r => r.building))].sort((a,b) => a - b);
+  const buildings = [...new Set(RESIDENTS.filter(r => !r.propMgr).map(r => r.building))].sort((a,b) => a - b);
   // Remove old building buttons (keep the "All" button)
   const existing = tabBar.querySelectorAll('[data-filter]:not([data-filter="all"])');
   existing.forEach(b => b.remove());
