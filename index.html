@@ -473,6 +473,16 @@
 // ═══════════════════════════════════════════════════════════════════
 
 const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycby2dLJ8pqO81vBivd0PZZXGgjXj4rIAQLSVD677IrBY7Lr3qsITi4mrOUCqtP9aASio/exec";
+// ── Case-insensitive field getter ──────────────────────────────────
+function getField(r, key) {
+  if (r[key] !== undefined) return String(r[key]);
+  const lk = key.toLowerCase();
+  for (const k of Object.keys(r)) {
+    if (k.toLowerCase() === lk) return String(r[k]);
+  }
+  return '';
+}
+
 // ── Normalise a row from Apps Script JSON ──────────────────────────
 function normaliseRow(r) {
   return {
@@ -486,10 +496,10 @@ function normaliseRow(r) {
     cell2:     String(r.cell2  || '').trim(),       // second person's cell
     cell2name: String(r.cell2name || '').trim(),    // name label for cell2 (e.g. "John")
     cell1name: String(r.cell1name || '').trim(),    // name label for cell  (e.g. "Mary")
-    board:      String(r.board  || '').trim().toLowerCase() === 'yes',
+    board:      getField(r, 'board').trim().toLowerCase() === 'yes',
     boardName:  String(r.boardName  || '').trim(),   // first name of the board member if unit has 2 owners
     boardTitle: String(r.boardTitle || '').trim(),   // e.g. President, VP, Secretary, Treasurer
-    propMgr:    String(r.propMgr || '').trim().toLowerCase() === 'yes',
+    propMgr:    getField(r, 'propMgr').trim().toLowerCase() === 'yes',
     alt:       String(r.alt    || '').trim(),
   };
 }
@@ -715,7 +725,7 @@ function render() {
   }
 
   let list = RESIDENTS.filter(r => r.full);
-  if (currentView === 'building') list = list.filter(r => !r.propMgr && r.building > 0);
+  if (currentView === 'building') list = list.filter(r => r.building > 0);
   if (currentFilter !== 'all') list = list.filter(r => r.building === currentFilter);
   if (query) list = list.filter(r => matches(r, query));
 
@@ -810,7 +820,7 @@ const tabBar = document.getElementById('tabBar');
 tabBar.style.display = 'none';
 
 function initTabs() {
-  const buildings = [...new Set(RESIDENTS.filter(r => !r.propMgr && r.building > 0).map(r => r.building))].sort((a,b) => a - b);
+  const buildings = [...new Set(RESIDENTS.filter(r => r.building > 0).map(r => r.building))].sort((a,b) => a - b);
   // Remove ALL existing building buttons (keep only "All")
   tabBar.querySelectorAll('.tab-btn').forEach(b => { if (b.dataset.filter !== 'all') b.remove(); });
   buildings.forEach(b => {
@@ -840,7 +850,7 @@ async function loadData() {
     if (!res.ok) throw new Error('Network error');
     const rows = await res.json();
     RESIDENTS = rows.map(normaliseRow);
-    const totalCount = RESIDENTS.filter(r => r.full && !r.propMgr).length;
+    const totalCount = RESIDENTS.filter(r => r.full).length;
     document.getElementById('resCount').textContent = `${totalCount} residents`;
     statusMsg.style.display = 'none';
     initTabs();
